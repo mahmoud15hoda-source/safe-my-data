@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>سلم وثعبان - حماية بياناتي الرقمية</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Tahoma,"Segoe UI",Arial,sans-serif;background:#e8f1fb;color:#1b2a41;text-align:center}
+h1{margin:12px 8px 4px;font-size:24px;color:#0b4f8a}
+.sub{margin:0 0 10px;color:#4a5f7a;font-size:14px}
+#start,#game,#end{max-width:620px;margin:0 auto;padding:10px}
+input{font:inherit;padding:10px;border-radius:10px;border:2px solid #9bb8d6;width:80%;text-align:center;margin:10px 0}
+button{font:inherit;cursor:pointer;border:0;border-radius:12px;padding:12px 22px;background:#0b6bcb;color:#fff;font-size:17px}
+button:hover{background:#0a58a8}
+button:disabled{background:#9aa9ba;cursor:default}
+#boardWrap{position:relative;width:504px;height:420px;margin:8px auto;max-width:100%;direction:ltr}
+#board{position:absolute;inset:0;display:grid;grid-template-columns:repeat(6,1fr);grid-template-rows:repeat(5,1fr);border:3px solid #0b4f8a;border-radius:10px;overflow:hidden;background:#fff}
+.cell{border:1px solid #cfdceb;font-size:13px;font-weight:bold;color:#6a7f99;padding:3px;text-align:left}
+.cell:nth-child(odd){background:#f4f9ff}
+.cell.fin{background:#ffe9a6}
+svg{position:absolute;inset:0;pointer-events:none;width:100%;height:100%}
+#token{position:absolute;width:34px;height:34px;margin:-17px 0 0 -17px;border-radius:50%;background:#e8452c;border:3px solid #fff;box-shadow:0 2px 6px #0006;transition:left .5s,top .5s;font-size:18px;line-height:28px;color:#fff}
+#info{font-size:16px;margin:6px;min-height:24px}
+#dice{display:inline-block;width:64px;height:64px;line-height:64px;font-size:40px;background:#fff;border:3px solid #0b4f8a;border-radius:12px;margin:0 10px;vertical-align:middle}
+#qbox{display:none;position:fixed;inset:0;background:#0008;z-index:5;align-items:center;justify-content:center}
+#qin{background:#fff;border-radius:16px;padding:18px;width:92%;max-width:480px}
+#qin h2{font-size:19px;margin:0 0 12px;color:#0b4f8a}
+.opt{display:block;width:100%;margin:8px 0;background:#eaf3fd;color:#1b2a41;border:2px solid #9bb8d6;text-align:right;font-size:16px}
+.opt:hover{background:#d3e7fb}
+.ok{background:#bdeccb!important;border-color:#2e9e57!important}
+.bad{background:#f7c4c4!important;border-color:#c94040!important}
+#fb{margin-top:8px;font-weight:bold;min-height:22px}
+.stat{font-size:14px;color:#4a5f7a}
+</style>
+</head>
+<body>
+<h1>🔐 سلم وثعبان: حماية بياناتي الرقمية</h1>
+<p class="sub">الصف السادس الابتدائي - الوحدة الثانية - الدرس الثاني</p>
+
+<div id="start">
+  <p>اكتب اسمك وابدأ اللعب. ارمي النرد، وجاوب على السؤال صح عشان تتحرك!</p>
+  <input id="nm" placeholder="اسمك">
+  <br><button onclick="startGame()">ابدأ اللعب</button>
+</div>
+
+<div id="game" style="display:none">
+  <div id="info"></div>
+  <div id="boardWrap">
+    <div id="board"></div>
+    <svg id="lines" viewBox="0 0 504 420"></svg>
+    <div id="token">★</div>
+  </div>
+  <div><span id="dice">🎲</span><button id="rollBtn" onclick="roll()">ارمي النرد</button></div>
+  <p class="stat">🪜 السلم بيطلّعك | 🐍 الثعبان بينزّلك | الإجابات الصح: <span id="sc">0</span> | الأدوار: <span id="tn">0</span></p>
+</div>
+
+<div id="end" style="display:none">
+  <h2 id="endT"></h2>
+  <p id="endS"></p>
+  <button onclick="location.reload()">العب تاني</button>
+</div>
+
+<div id="qbox"><div id="qin"><h2 id="qt"></h2><div id="qo"></div><div id="fb"></div></div></div>
+
+<script>
+const C=6,R=5,W=84,H=84,END=30;
+const ladders={3:13,8:19,16:26};
+const snakes={18:6,24:12,28:14};
+const Q=[
+["كلمة المرور القوية لازم تكون:",["تاريخ ميلادك","خليط من حروف وأرقام ورموز","اسمك فقط","قصيرة وسهلة"],1],
+["أقل عدد حروف لكلمة المرور القوية:",["3 حروف","4 حروف","8 حروف أو أكتر"],2],
+["وصلك رابط غريب من شخص متعرفوش، تعمل إيه؟",["تضغط عليه","تتجاهله ومتضغطش عليه","تبعته لصحابك"],1],
+["إزاي تعرف إن الموقع آمن؟",["الرابط بيبدأ بـ http بس","فيه رمز القفل وبيبدأ بـ https","فيه إعلانات كتير","فيه أخطاء لغوية كتير"],1],
+["المصادقة متعددة العوامل بتطلب:",["طريقة واحدة بس","طريقتين على الأقل لتحديد هويتك","مفيش حاجة"],1],
+["التشفير الكامل بيعمل إيه؟",["بيحمي بياناتك","بيسرّع النت","بيمسح ملفاتك"],0],
+["إيه الأكتر أمانًا من كلمة المرور العادية؟",["كتابة اسمك","البصمة أو التعرف على الوجه","الرقم 1234"],1],
+["لو بياناتك اتعرضت للخطر، تعمل إيه؟",["تسكت","تقول لوالدك أو لشخص بالغ موثوق","تقول لأي حد"],1],
+["كلمة المرور بتاعتك:",["نشاركها مع أقرب صحابنا","نشاركها مع أي حد","منشاركهاش مع حد"],2],
+["ينفع نستخدم نفس كلمة المرور في كل حساباتنا؟",["أيوه ينفع","لا، مينفعش"],1],
+["موقع بيطلب كلمات المرور والبيانات البنكية بطريقة مشبوهة، يبقى:",["موقع غير آمن","موقع موثوق"],0],
+["من مسؤوليتي الشخصية:",["أسيب جهازي مفتوح","أتأكد إن جهازي مقفول بكلمة مرور","أدّي جهازي لأي حد"],1],
+["تحديث برامج الحماية باستمرار:",["بيحافظ على الأمان الرقمي","ملوش لازمة"],0],
+["إيه اللي مينفعش تختاره ككلمة مرور؟",["اسم الأب أو تاريخ الميلاد","خليط عشوائي من حروف وأرقام ورموز"],0],
+["لو بياناتك اتسرقت، نبلّغ مين كمان؟",["السلطات المسؤولة","محدش"],0],
+["من علامات الموقع الموثوق:",["معلومات واضحة عن الجهة المالكة وسياسة خصوصية","طلب بيانات شخصية مش ضرورية","إعلانات مزعجة"],0]
+];
+let pos=0,sc=0,tn=0,busy=false,deck=[],name="";
+const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
+function xy(n){const i=n-1,r=Math.floor(i/C),k=i%C,c=r%2===0?k:C-1-k;return[c*W+W/2,(R-1-r)*H+H/2]}
+function build(){
+  const b=document.getElementById('board');b.innerHTML='';
+  for(let r=R-1;r>=0;r--)for(let c=0;c<C;c++){
+    const n=r*C+(r%2===0?c+1:C-c);
+    const d=document.createElement('div');d.className='cell'+(n===END?' fin':'');
+    d.textContent=n===END?'🏁 '+n:n;b.appendChild(d);
+  }
+  let s='';
+  for(const a in ladders){const[x1,y1]=xy(+a),[x2,y2]=xy(ladders[a]);
+    s+=`<line x1="${x1-8}" y1="${y1}" x2="${x2-8}" y2="${y2}" stroke="#2e9e57" stroke-width="5" opacity=".8"/><line x1="${x1+8}" y1="${y1}" x2="${x2+8}" y2="${y2}" stroke="#2e9e57" stroke-width="5" opacity=".8"/>`;
+    s+=`<text x="${x1-6}" y="${y1+22}" font-size="18">🪜</text>`}
+  for(const a in snakes){const[x1,y1]=xy(+a),[x2,y2]=xy(snakes[a]);
+    const mx=(x1+x2)/2+30,my=(y1+y2)/2;
+    s+=`<path d="M${x1} ${y1} Q${mx} ${my} ${x2} ${y2}" stroke="#c94040" stroke-width="6" fill="none" opacity=".8" stroke-linecap="round"/>`;
+    s+=`<text x="${x1-10}" y="${y1+6}" font-size="22">🐍</text>`}
+  document.getElementById('lines').innerHTML=s;
+  place();
+}
+function place(){const t=document.getElementById('token');
+  const [x,y]=pos===0?[-20,H*R-H/2]:xy(pos);t.style.left=x+'px';t.style.top=y+'px'}
+function startGame(){
+  name=document.getElementById('nm').value.trim()||'يا بطل';
+  document.getElementById('start').style.display='none';
+  document.getElementById('game').style.display='block';
+  build();say('يلا يا '+name+'! ارمي النرد 🎲');
+}
+function say(t){document.getElementById('info').textContent=t}
+function roll(){
+  if(busy)return;busy=true;document.getElementById('rollBtn').disabled=true;
+  const d=document.getElementById('dice');let k=0;
+  const iv=setInterval(()=>{d.textContent=Math.ceil(Math.random()*6);if(++k>8){clearInterval(iv);const v=Math.ceil(Math.random()*6);d.textContent=v;ask(v)}},70);
+}
+function ask(v){
+  tn++;document.getElementById('tn').textContent=tn;
+  if(!deck.length)deck=shuffle(Q.map((q,i)=>i));
+  const q=Q[deck.pop()];
+  const opts=shuffle(q[1].map((t,i)=>({t,ok:i===q[2]})));
+  document.getElementById('qt').textContent='رميت '+v+' — جاوب صح عشان تتحرك:\n'+q[0];
+  document.getElementById('qt').style.whiteSpace='pre-line';
+  const o=document.getElementById('qo');o.innerHTML='';document.getElementById('fb').textContent='';
+  opts.forEach(x=>{const b=document.createElement('button');b.className='opt';b.textContent=x.t;
+    b.onclick=()=>answer(x.ok,b,opts,v);o.appendChild(b)});
+  document.getElementById('qbox').style.display='flex';
+}
+function answer(ok,btn,opts,v){
+  const bs=[...document.querySelectorAll('.opt')];
+  bs.forEach((b,i)=>{b.disabled=true;if(opts[i].ok)b.classList.add('ok')});
+  const fb=document.getElementById('fb');
+  if(ok){sc++;document.getElementById('sc').textContent=sc;fb.textContent='✅ إجابة صحيحة! هتتحرك '+v+' خطوات';fb.style.color='#2e9e57'}
+  else{btn.classList.add('bad');fb.textContent='❌ إجابة غلط، مكانك زي ما هو. حاول تاني!';fb.style.color='#c94040'}
+  setTimeout(()=>{document.getElementById('qbox').style.display='none';after(ok,v)},1700);
+}
+function after(ok,v){
+  if(ok){
+    pos=Math.min(END,pos+v);place();
+    setTimeout(()=>{
+      if(ladders[pos]){say('🪜 سلم! طلعت للمربع '+ladders[pos]);pos=ladders[pos];place()}
+      else if(snakes[pos]){say('🐍 ثعبان! نزلت للمربع '+snakes[pos]);pos=snakes[pos];place()}
+      else say('أنت دلوقتي في المربع '+pos);
+      setTimeout(fin,700);
+    },600);
+  }else{say('كمّل المحاولة، أنت في المربع '+(pos||'البداية'));fin()}
+}
+function fin(){
+  if(pos>=END){
+    document.getElementById('game').style.display='none';
+    document.getElementById('end').style.display='block';
+    document.getElementById('endT').textContent='🏆 مبروك يا '+name+'! وصلت للنهاية';
+    document.getElementById('endS').textContent='إجاباتك الصح: '+sc+' في '+tn+' دور';
+    return;
+  }
+  busy=false;document.getElementById('rollBtn').disabled=false;
+}
+</script>
+</body>
+</html>
